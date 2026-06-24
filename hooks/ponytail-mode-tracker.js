@@ -12,6 +12,7 @@ process.stdin.on('end', () => {
     // Strip UTF-8 BOM some shells prepend when piping (breaks JSON.parse)
     const data = JSON.parse(input.replace(/^\uFEFF/, ''));
     const prompt = (data.prompt || '').trim().toLowerCase();
+    const sessionId = data.session_id;
 
     // Match /ponytail commands
     if (/^[/@$]ponytail/.test(prompt)) {
@@ -32,21 +33,21 @@ process.stdin.on('end', () => {
       }
 
       if (mode && mode !== 'off') {
-        setMode(mode);
+        setMode(mode, sessionId);
         writeHookOutput(
           'UserPromptSubmit',
           mode,
           'PONYTAIL MODE CHANGED — level: ' + mode,
         );
       } else if (mode === 'off') {
-        clearMode();
+        clearMode(sessionId);
         writeHookOutput('UserPromptSubmit', 'off', 'PONYTAIL MODE OFF');
       }
     }
 
     // Detect deactivation
     if (isDeactivationCommand(prompt)) {
-      clearMode();
+      clearMode(sessionId);
       writeHookOutput('UserPromptSubmit', 'off', 'PONYTAIL MODE OFF');
     }
   } catch (e) {

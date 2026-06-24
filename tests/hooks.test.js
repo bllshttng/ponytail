@@ -209,4 +209,46 @@ assert.equal(output.systemMessage, 'PONYTAIL:FULL');
 assert.equal(output.hookSpecificOutput.hookEventName, 'SubagentStart');
 assert.match(output.hookSpecificOutput.additionalContext, /PONYTAIL MODE ACTIVE — level: full/);
 
+// Per-session isolation: concurrent native-Claude sessions must not share one flag.
+// session_id arrives on stdin; the flag becomes .ponytail-active-<session_id>, so a
+// stop/mode-switch in one session can't leak into another's subagents or badge.
+const isoHome = path.join(temp, 'iso-home');
+const isoDir = path.join(isoHome, '.claude');
+fs.mkdirSync(isoDir, { recursive: true });
+const isoEnv = { HOME: isoHome, USERPROFILE: isoHome };
+const flagA = path.join(isoDir, '.ponytail-active-AAA');
+const flagB = path.join(isoDir, '.ponytail-active-BBB');
+const sharedFlag = path.join(isoDir, '.ponytail-active');
+
+// activate keys the flag by session_id and leaves the shared flag untouched.
+result = run('ponytail-activate.js', { ...isoEnv, PONYTAIL_DEFAULT_MODE: 'ultra' }, JSON.stringify({ session_id: 'AAA' }));
+assert.equal(result.status, 0, result.stderr);
+assert.equal(fs.readFileSync(flagA, 'utf8'), 'ultra');
+assert.equal(fs.existsSync(sharedFlag), false, 'session_id present → must not write the shared flag');
+
+result = run('ponytail-activate.js', { ...isoEnv, PONYTAIL_DEFAULT_MODE: 'full' }, JSON.stringify({ session_id: 'BBB' }));
+assert.equal(result.status, 0, result.stderr);
+assert.equal(fs.readFileSync(flagB, 'utf8'), 'full');
+
+// Each subagent reads its own session's flag — no cross-session bleed.
+result = run('ponytail-subagent.js', isoEnv, JSON.stringify({ session_id: 'AAA' }));
+assert.match(JSON.parse(result.stdout).hookSpecificOutput.additionalContext, /level: ultra/);
+result = run('ponytail-subagent.js', isoEnv, JSON.stringify({ session_id: 'BBB' }));
+assert.match(JSON.parse(result.stdout).hookSpecificOutput.additionalContext, /level: full/);
+result = run('ponytail-subagent.js', isoEnv, JSON.stringify({ session_id: 'CCC' }));
+assert.equal(result.stdout, '', 'a session with no flag of its own must inherit nothing');
+
+// A mode switch in one session must leave the other untouched.
+result = run('ponytail-mode-tracker.js', isoEnv, JSON.stringify({ prompt: '/ponytail lite', session_id: 'AAA' }));
+assert.equal(result.status, 0, result.stderr);
+assert.equal(fs.readFileSync(flagA, 'utf8'), 'lite');
+assert.equal(fs.readFileSync(flagB, 'utf8'), 'full', 'mode switch in AAA must not touch BBB');
+assert.equal(fs.existsSync(sharedFlag), false);
+
+// stop ponytail clears only the issuing session's flag (issue: shared-flag leak).
+result = run('ponytail-mode-tracker.js', isoEnv, JSON.stringify({ prompt: 'stop ponytail', session_id: 'AAA' }));
+assert.equal(result.status, 0, result.stderr);
+assert.equal(fs.existsSync(flagA), false, 'stop must remove the issuing session flag');
+assert.equal(fs.readFileSync(flagB, 'utf8'), 'full', 'stop in AAA must not disable BBB');
+
 console.log('hook compatibility checks passed');
