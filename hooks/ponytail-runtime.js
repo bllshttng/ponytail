@@ -2,7 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const { getClaudeDir } = require('./ponytail-config');
 
-const STATE_FILE = '.ponytail-active';
+// Per-session flag files live inside one .ponytail/ dir instead of littering the
+// config root with a .ponytail-active-<session_id> per session.
+const STATE_DIR = '.ponytail';
 const isCopilot = Boolean(process.env.COPILOT_PLUGIN_DATA);
 const isCodex = !isCopilot && Boolean(process.env.PLUGIN_DATA);
 
@@ -10,16 +12,17 @@ let stateDir = getClaudeDir();
 if (isCodex) stateDir = process.env.PLUGIN_DATA;
 if (isCopilot) stateDir = process.env.COPILOT_PLUGIN_DATA;
 
-const sharedPath = path.join(stateDir, STATE_FILE);
+const sessionDir = path.join(stateDir, STATE_DIR);
+const sharedPath = path.join(sessionDir, 'shared');
 
 // Per-session flag keeps concurrent Claude sessions from aliasing onto one global
 // flag — a stop/mode-switch in one session used to leak into another's subagents
 // and badge. Claude passes session_id to every hook; when it's absent (Codex,
 // Copilot, tests) we fall back to the shared flag, preserving prior behavior.
-// session_id is UUID-ish; allow only filename-safe chars so it can't escape stateDir.
+// session_id is UUID-ish; allow only filename-safe chars so it can't escape sessionDir.
 function statePathFor(sessionId) {
   const ok = typeof sessionId === 'string' && /^[A-Za-z0-9_-]+$/.test(sessionId);
-  return ok ? path.join(stateDir, STATE_FILE + '-' + sessionId) : sharedPath;
+  return ok ? path.join(sessionDir, sessionId) : sharedPath;
 }
 
 function setMode(mode, sessionId) {

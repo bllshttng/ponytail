@@ -24,7 +24,9 @@ const home = path.join(temp, 'home');
 const claudeDir = path.join(home, '.claude');
 fs.mkdirSync(claudeDir, { recursive: true });
 
-const flagPath = path.join(claudeDir, '.ponytail-active');
+const flagDir = path.join(claudeDir, '.ponytail');
+const flagPath = path.join(flagDir, 'AAA');
+fs.mkdirSync(flagDir, { recursive: true });
 fs.writeFileSync(flagPath, 'full');
 
 const configDir = path.join(temp, 'config-home', 'ponytail');
@@ -45,7 +47,7 @@ const env = {
 
 let result = runUninstall(env);
 assert.equal(result.status, 0, result.stderr);
-assert.equal(fs.existsSync(flagPath), false, 'mode flag must be removed');
+assert.equal(fs.existsSync(flagDir), false, 'mode flag dir must be removed');
 assert.equal(fs.existsSync(configPath), false, 'config file must be removed');
 
 const settingsAfter = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));

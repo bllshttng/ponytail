@@ -7,10 +7,10 @@ dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 # Absent or odd value → shared flag, matching statePathFor's fallback in the hooks.
 input=$(cat 2>/dev/null)
 sid=$(printf '%s' "$input" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' | head -n1 | sed 's/.*"\([^"]*\)"$/\1/')
-flag="$dir/.ponytail-active"
+flag="$dir/.ponytail/shared"
 case "$sid" in
     *[!A-Za-z0-9_-]*|'') ;;
-    *) flag="$dir/.ponytail-active-$sid" ;;
+    *) flag="$dir/.ponytail/$sid" ;;
 esac
 [ -f "$flag" ] || exit 0
 

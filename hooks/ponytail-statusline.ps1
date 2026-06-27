@@ -5,9 +5,10 @@ $ClaudeDir = if ($env:CLAUDE_CONFIG_DIR) { $env:CLAUDE_CONFIG_DIR } else { Join-
 # Claude pipes the statusline JSON on stdin; absent/odd session_id → shared flag.
 $Sid = ""
 try { $Sid = ([Console]::In.ReadToEnd() | ConvertFrom-Json).session_id } catch {}
-$Flag = Join-Path $ClaudeDir ".ponytail-active"
+$PonytailDir = Join-Path $ClaudeDir ".ponytail"
+$Flag = Join-Path $PonytailDir "shared"
 if ($Sid -and $Sid -match '^[A-Za-z0-9_-]+$') {
-    $Flag = Join-Path $ClaudeDir ".ponytail-active-$Sid"
+    $Flag = Join-Path $PonytailDir $Sid
 }
 if (-not (Test-Path $Flag)) {
     exit 0

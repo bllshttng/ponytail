@@ -50,7 +50,7 @@ const codexEnv = {
   PLUGIN_DATA: pluginData,
   PONYTAIL_DEFAULT_MODE: 'ultra',
 };
-const codexState = path.join(pluginData, '.ponytail-active');
+const codexState = path.join(pluginData, '.ponytail', 'shared');
 
 let result = run('ponytail-activate.js', codexEnv);
 assert.equal(result.status, 0, result.stderr);
@@ -109,7 +109,7 @@ delete claudeEnv.PLUGIN_DATA;
 result = run('ponytail-activate.js', claudeEnv);
 assert.equal(result.status, 0, result.stderr);
 assert.equal(
-  fs.readFileSync(path.join(home, '.claude', '.ponytail-active'), 'utf8'),
+  fs.readFileSync(path.join(home, '.claude', '.ponytail', 'shared'), 'utf8'),
   'full',
 );
 
@@ -125,11 +125,11 @@ result = run('ponytail-activate.js', {
 });
 assert.equal(result.status, 0, result.stderr);
 assert.equal(
-  fs.readFileSync(path.join(customConfigDir, '.ponytail-active'), 'utf8'),
+  fs.readFileSync(path.join(customConfigDir, '.ponytail', 'shared'), 'utf8'),
   'lite',
 );
 assert.equal(
-  fs.existsSync(path.join(home2, '.claude', '.ponytail-active')),
+  fs.existsSync(path.join(home2, '.claude', '.ponytail', 'shared')),
   false,
   'flag must not land in ~/.claude when CLAUDE_CONFIG_DIR is set',
 );
@@ -144,9 +144,9 @@ result = run('ponytail-activate.js', {
   PONYTAIL_DEFAULT_MODE: 'full',
 });
 assert.equal(result.status, 0, result.stderr);
-assert.equal(fs.readFileSync(path.join(copilotData, '.ponytail-active'), 'utf8'), 'full');
+assert.equal(fs.readFileSync(path.join(copilotData, '.ponytail', 'shared'), 'utf8'), 'full');
 assert.equal(
-  fs.existsSync(path.join(codexData, '.ponytail-active')),
+  fs.existsSync(path.join(codexData, '.ponytail', 'shared')),
   false,
   'copilot hooks must not write mode state to codex PLUGIN_DATA',
 );
@@ -164,9 +164,9 @@ result = run(
   JSON.stringify({ prompt: '/ponytail ultra' }),
 );
 assert.equal(result.status, 0, result.stderr);
-assert.equal(fs.readFileSync(path.join(copilotData, '.ponytail-active'), 'utf8'), 'ultra');
+assert.equal(fs.readFileSync(path.join(copilotData, '.ponytail', 'shared'), 'utf8'), 'ultra');
 assert.equal(
-  fs.existsSync(path.join(codexData, '.ponytail-active')),
+  fs.existsSync(path.join(codexData, '.ponytail', 'shared')),
   false,
   'copilot mode tracker must keep codex PLUGIN_DATA untouched',
 );
@@ -177,7 +177,7 @@ assert.deepEqual(output, {});
 // each subagent (issue #252). Native Claude must get the hookSpecificOutput JSON
 // form, not raw stdout, or the context is dropped.
 const subHome = path.join(temp, 'sub-home');
-const subFlag = path.join(subHome, '.claude', '.ponytail-active');
+const subFlag = path.join(subHome, '.claude', '.ponytail', 'shared');
 fs.mkdirSync(path.dirname(subFlag), { recursive: true });
 const subEnv = { HOME: subHome, USERPROFILE: subHome };
 
@@ -201,7 +201,8 @@ assert.equal(result.stdout, '', 'SubagentStart must stay silent when ponytail is
 // too — assert the codex branch emits the badge plus hookSpecificOutput.
 const subCodex = path.join(temp, 'sub-codex');
 fs.mkdirSync(subCodex, { recursive: true });
-fs.writeFileSync(path.join(subCodex, '.ponytail-active'), 'full');
+fs.mkdirSync(path.join(subCodex, '.ponytail'), { recursive: true });
+fs.writeFileSync(path.join(subCodex, '.ponytail', 'shared'), 'full');
 result = run('ponytail-subagent.js', { HOME: subHome, USERPROFILE: subHome, PLUGIN_DATA: subCodex });
 assert.equal(result.status, 0, result.stderr);
 output = JSON.parse(result.stdout);
@@ -210,15 +211,15 @@ assert.equal(output.hookSpecificOutput.hookEventName, 'SubagentStart');
 assert.match(output.hookSpecificOutput.additionalContext, /PONYTAIL MODE ACTIVE — level: full/);
 
 // Per-session isolation: concurrent native-Claude sessions must not share one flag.
-// session_id arrives on stdin; the flag becomes .ponytail-active-<session_id>, so a
+// session_id arrives on stdin; the flag becomes .ponytail/<session_id>, so a
 // stop/mode-switch in one session can't leak into another's subagents or badge.
 const isoHome = path.join(temp, 'iso-home');
-const isoDir = path.join(isoHome, '.claude');
+const isoDir = path.join(isoHome, '.claude', '.ponytail');
 fs.mkdirSync(isoDir, { recursive: true });
 const isoEnv = { HOME: isoHome, USERPROFILE: isoHome };
-const flagA = path.join(isoDir, '.ponytail-active-AAA');
-const flagB = path.join(isoDir, '.ponytail-active-BBB');
-const sharedFlag = path.join(isoDir, '.ponytail-active');
+const flagA = path.join(isoDir, 'AAA');
+const flagB = path.join(isoDir, 'BBB');
+const sharedFlag = path.join(isoDir, 'shared');
 
 // activate keys the flag by session_id and leaves the shared flag untouched.
 result = run('ponytail-activate.js', { ...isoEnv, PONYTAIL_DEFAULT_MODE: 'ultra' }, JSON.stringify({ session_id: 'AAA' }));
