@@ -2,7 +2,7 @@
 // ponytail — Claude Code SessionStart activation hook
 //
 // Runs on every session start:
-//   1. Writes flag file at $CLAUDE_CONFIG_DIR/.ponytail-active (defaults to ~/.claude; statusline reads this)
+//   1. Writes per-session flag file under $CLAUDE_CONFIG_DIR/.ponytail/ (defaults to ~/.claude; statusline reads this)
 //   2. Emits ponytail ruleset as hidden SessionStart context
 //   3. Detects missing statusline config and emits setup nudge
 
@@ -14,6 +14,7 @@ const {
   clearMode,
   isCodex,
   isCopilot,
+  readHookInput,
   setMode,
   writeHookOutput,
 } = require('./ponytail-runtime');
@@ -23,9 +24,14 @@ const settingsPath = path.join(claudeDir, 'settings.json');
 
 const mode = getDefaultMode();
 
+// session_id (from stdin) keys the flag per-session so concurrent sessions don't
+// collide. Absent (Codex/Copilot) → shared flag, via statePathFor's fallback.
+readHookInput((data) => {
+const sessionId = data.session_id;
+
 // "off" mode — skip activation entirely, don't write flag or emit rules
 if (mode === 'off') {
-  clearMode();
+  clearMode(sessionId);
   const hookOutput = (isCodex || isCopilot) ? '' : 'OK';
   writeHookOutput('SessionStart', 'off', hookOutput);
   process.exit(0);
@@ -33,7 +39,7 @@ if (mode === 'off') {
 
 // 1. Write flag file
 try {
-  setMode(mode);
+  setMode(mode, sessionId);
 } catch (e) {
   // Silent fail -- flag is best-effort, don't block the hook
 }
@@ -89,3 +95,4 @@ try {
 } catch (e) {
   // Silent fail — stdout closed/EPIPE at hook exit must not surface as a hook failure
 }
+});

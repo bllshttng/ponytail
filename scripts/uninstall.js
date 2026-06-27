@@ -11,14 +11,14 @@ const { getConfigPath, getClaudeDir } = require('../hooks/ponytail-config');
 
 function removeIfExists(filePath, label) {
   try {
-    fs.unlinkSync(filePath);
+    fs.rmSync(filePath, { recursive: true, force: false });
     console.log(`Removed ${label}: ${filePath}`);
   } catch (e) {
     if (e.code !== 'ENOENT') throw e;
   }
 }
 
-removeIfExists(path.join(getClaudeDir(), '.ponytail-active'), 'mode flag');
+removeIfExists(path.join(getClaudeDir(), '.ponytail'), 'mode flags');
 removeIfExists(getConfigPath(), 'config file');
 
 const settingsPath = path.join(getClaudeDir(), 'settings.json');

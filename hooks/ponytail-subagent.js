@@ -6,17 +6,21 @@
 // When ponytail mode is active, inject the same ruleset into each subagent.
 
 const { getPonytailInstructions } = require('./ponytail-instructions');
-const { readMode, writeHookOutput } = require('./ponytail-runtime');
+const { readHookInput, readMode, writeHookOutput } = require('./ponytail-runtime');
 
-const mode = readMode();
+// session_id is the PARENT session's id, so the subagent reads its own session's
+// flag (issue #254 inheritance) without picking up another session's mode.
+readHookInput((data) => {
+  const mode = readMode(data.session_id);
 
-// Absent flag or off → ponytail isn't active; inject nothing.
-if (!mode || mode === 'off') {
-  process.exit(0);
-}
+  // Absent flag or off → ponytail isn't active; inject nothing.
+  if (!mode || mode === 'off') {
+    process.exit(0);
+  }
 
-try {
-  writeHookOutput('SubagentStart', mode, getPonytailInstructions(mode));
-} catch (e) {
-  // Silent fail — a stdout error at hook exit must not surface as a hook failure.
-}
+  try {
+    writeHookOutput('SubagentStart', mode, getPonytailInstructions(mode));
+  } catch (e) {
+    // Silent fail — a stdout error at hook exit must not surface as a hook failure.
+  }
+});
